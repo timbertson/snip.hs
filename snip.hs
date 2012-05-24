@@ -25,7 +25,6 @@ import Data.List
 import Data.Tree
 import System.Directory
 import System.Environment
-import System.Posix (usleep)
 
 import System.IO.Unsafe
 
@@ -43,24 +42,39 @@ type DirTree    = Tree DirName     -- file-system tree
 main :: IO ()
 main = do
 	args <- getArgs
-	mapM_ traverseAndPrint (if null args then ["."] else args)
+	tree <- fsTraverse "."
+	-- putStr $ drawTree tree
+	putStr (show $ levels tree)
+	-- mapM_ traverseAndPrint ["."]
 
 traverseAndPrint :: Path -> IO ()
 traverseAndPrint path =
-	putStr . showTree =<< fsTraverse root path
+	putStr . showTree =<< fsTraverse root
 	where
 		root = if "/" `isPrefixOf` path then "" else "."
 
+findForest :: Path -> Forest DirName -> DirName -> Maybe DirNode
+findForest prefix nodes needle = fmap mkDirNode found
+	where
+		mkDirNode node = (prefix, rootLabel node)
+		found = find (((==) needle) . rootLabel) nodes
+
+stringy :: DirTree -> Tree String
+stringy = fmap show
 
 -- Effectful tree-builder for file-system hierarchies
+dirsep = "/"
+joinPath lst = concat $ intersperse dirsep lst
+joinOne a b = joinPath [a,b]
 
-fsTraverse :: Path -> DirName -> IO DirTree
-fsTraverse = curry (lazyUnfoldTreeM fsTraverseStep)
+fsTraverse :: Path -> IO DirTree
+-- fsTraverse = curry (lazyUnfoldTreeM fsTraverseStep)
+fsTraverse path = (lazyUnfoldTreeM fsTraverseStep) (path, ".")
 
 fsTraverseStep :: DirNode -> IO (DirName, [DirNode])
 fsTraverseStep dnode@(path, node) = do
 	name <- fsVisit dnode
-	children <- fsGetChildren (path ++ "/" ++ node)
+	children <- fsGetChildren (joinOne path node)
 	return (name, children)
 
 
@@ -68,7 +82,6 @@ fsTraverseStep dnode@(path, node) = do
 
 fsVisit :: DirNode -> IO DirName
 fsVisit (_, name) = do
-	-- usleep 100000
 	return name
 
 
@@ -78,8 +91,24 @@ fsGetChildren :: Path -> IO [DirNode]
 fsGetChildren path = do
 	contents <- getDirectoryContents path `catch` const (return [])
 	let visibles = sort . filter (`notElem` [".", ".."]) $ contents
+	let isDir name = doesDirectoryExist $ joinOne path name
+	(dirs, files) <- partitionM isDir visibles
+	print visibles
 	return (map ((,) path) visibles)
 
+-- PartitionM - apply Data.List.Partition for a predicate of type (M Bool)
+
+partitionM :: Monad m => (a -> m Bool) -> [a] -> m ([a],[a])
+partitionM p xs = do
+	(f,g) <- pMHelper p xs
+	return (f [], g [])
+	where
+		pMHelper :: Monad m => (a -> m Bool) -> [a] -> m ([a] -> [a],[a] -> [a])
+		pMHelper p xs = foldM help (id,id) xs
+			where
+				help (f,g) x = do
+				b <- p x
+				return (if b then (f . (x:),g) else (f,g . (x:)))
 
 lazyUnfoldTreeM :: (b -> IO (a, [b])) -> b -> IO (Tree a)
 lazyUnfoldTreeM step seed = do
@@ -88,6 +117,11 @@ lazyUnfoldTreeM step seed = do
 		unsafeInterleaveIO $
 		mapM (lazyUnfoldTreeM step) seeds
 	return (Node root children)
+
+-- purely functional "finder" functions
+
+-- find :: DirTree -> Maybe DirNode
+-- find t = 
 
 -- Purely functional tree-to-string formatting
 
