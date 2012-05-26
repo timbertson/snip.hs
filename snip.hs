@@ -51,43 +51,13 @@ import System.IO.Unsafe
 
 type QueryPath  = [String]
 type TreePath   = [DirName]
-type Path       = String           -- path
 type DirName    = String           -- directory-entry name
-type DirNode    = (Path, DirName)  -- directory-path/dirname pair
 type DirTree    = Tree DirName     -- file-system tree
+type DirNode    = (FilePath, DirName)  -- directory-path/dirname pair
+-- TODO: make DirNode a record type, combine it with Item below
 
 data Item = Folder [DirName] | File String deriving Show
-type Output = (Maybe Term.Color, String)
 
-color :: Term.Color -> a -> (Maybe Term.Color, a)
-color = (,) . Just
-plain = (,) Nothing
-red = color Term.Red
-blue = color Term.Blue
-
-render :: [[Output]] -> IO ()
-render outputs = mapM_ renderLine outputs
-
-renderLine :: [Output] -> IO ()
-renderLine outputs = do
-	mapM_ renderOutput outputs
-	putStrLn ""
-
-renderOutput :: Output -> IO ()
-renderOutput = (uncurry renderOutput') . convertOutput where
-	renderOutput' :: [Term.SGR] -> String -> IO ()
-	renderOutput' modes str = do
-		Term.setSGR modes
-		putStr str
-		Term.setSGR []
-
-convertOutput :: Output -> ([Term.SGR], String)
-convertOutput (Nothing, str) = ([], str)
-convertOutput (Just col, str) = ([Term.SetColor Term.Foreground Term.Dull col], str)
-
--- wrap a series of outputs into a single line
-outputLine :: [Output] -> [[Output]]
-outputLine = (: [])
 
 -- High-level program logic: process args and perform the appropriate action
 
@@ -104,18 +74,17 @@ run args = do
 		errorAction err = showError (show (err :: SomeException))
 		showError :: String -> IO ()
 		showError err = do
-			render (outputLine [red err])
+			outLn [red err]
 			exitFailure
 
 run' :: [String] -> IO ()
 run' args = do
 	let (action, query) = parseArgs args
-	colourize <- hIsTerminalDevice stdin
 	homedir <- getHomeDirectory
 	let base = joinOne homedir ".snip"
 	createDirectoryIfMissing True base
 	tree <- fsTraverse base
-	(action query tree)
+	action query tree
 
 getOrElse Nothing b = b
 getOrElse (Just a) _ = a
@@ -128,7 +97,6 @@ actions = [
 		("set",     actionSet,     Just "set the contents of a snippet (create or update)"),
 		("copy",    actionCopy,    Just "copy the contents of a snippet to the clipboard (requires `pyperclip`)"),
 		("all",     actionAll,     Just "list all snippets"),
-		-- ("new",     actionNew,     Just "create a new list"),
 		("rm",      actionRemove,  Just "remove a snippet or list"),
 		("which",   actionWhich,   Just "show the path to a snippet"),
 		("--help",  actionHelp,    Nothing)
@@ -172,13 +140,14 @@ actionSet args tree = do
 	unless baseExists (promptAndCreate relbase tree)
 	val <- getInput $ last args
 	writeFile path val
-	putStrLn $ "Got it. " ++ (joinPath relpath) ++ " is now: " ++ val
+	outLn [plain "Got it. ", yellow (joinPath relpath),  plain " is now ", green val]
 
-promptAndCreate :: Action
+-- promptAndCreate :: Action
 promptAndCreate args tree = do
 	continue <- (confirm $ "Folder " ++ (joinPath args) ++ " does not exist. create it?")
 	unless continue $ fail "Cancelled."
 	actionNew args tree
+	return ()
 
 confirm :: String -> IO Bool
 confirm question = do
@@ -196,7 +165,7 @@ actionNew :: Action
 actionNew args tree = do
 	let path = addToRoot tree args
 	createDirectoryIfMissing True path
-	putStrLn $ "Created: " ++ (joinPath args)
+	outLn [plain "Created: ", green (joinPath args)]
 
 actionWhich :: Action
 actionWhich = lookupAction (putStrLn . joinPath . fst)
@@ -214,7 +183,8 @@ lookupAction action search tree = success `getOrElse` (fail $ "Could not find " 
 		success = fmap action (resolvePath search tree)
 
 actionAll :: Action
-actionAll [] tree = putStr $ showTree tree
+-- TODO: make `all` render the contents, truncated at first `n` chatacters of first line
+actionAll [] tree = render $ showTree tree
 actionAll args _ = fail "too many arguments for `all`"
 
 actionHelp :: Action
@@ -234,7 +204,7 @@ addToRoot tree path = joinPath ([rootLabel tree] ++ path)
 copyToClipboard search item = do
 	output <- readProcess "pyperclip" ["--copy"] (up item)
 	putStr output -- should be empty, but just in case?
-	putStrLn $ "Copied " ++ (describeSearch search) ++ " to your clipboard."
+	outLn [plain "Copied ", yellow (describeSearch search), plain " to your clipboard"]
 
 describeSearch :: QueryPath -> String
 describeSearch = joinPath
@@ -253,18 +223,6 @@ getSnippetContents match@(path, tree) =
 				-- putStrLn $ "reading file: " ++ fullPath
 				contents <- readFile fullPath
 				return $ File contents
-
-
--- pretty print
-pp :: Item -> String
-pp (Folder []) = "(empty list)"
-pp (Folder contents) = " - " ++ (intercalate "\n - " contents)
-pp (File contents) = contents
-
--- ugly print
-up :: Item -> String
-up (Folder contents) = unlines contents
-up (File contents) = contents
 
 
 -- tree traversal / searching
@@ -313,7 +271,7 @@ pcons xs x = xs ++ [x]
 
 joinOne a b = joinPath [a,b]
 
-fsTraverse :: Path -> IO DirTree
+fsTraverse :: FilePath -> IO DirTree
 fsTraverse path = (lazyUnfoldTreeM fsTraverseStep) (path, path)
 
 fsTraverseStep :: DirNode -> IO (DirName, [DirNode])
@@ -324,7 +282,7 @@ fsTraverseStep dnode@(path, name) = do
 
 -- Helper to get traversable directory entries
 
-fsGetChildren :: Path -> IO [DirNode]
+fsGetChildren :: FilePath -> IO [DirNode]
 fsGetChildren path = do
 	contents <- getDirectoryContents path `Prelude.catch` const (return [])
 	let visibles = sort . filter (`notElem` [".", ".."]) $ contents
@@ -342,12 +300,66 @@ lazyUnfoldTreeM step seed = do
 
 -- Purely functional tree-to-string formatting
 
-showTree :: Tree String -> String
-showTree t = unlines (concat $ map (showNode "") (subForest t))
+showTree :: Tree String -> Output
+showTree t = concat $ map (showNode []) (subForest t)
 
-showNode :: String -> Tree String -> [String]
-showNode leader node =
-	nodeRep : childRep
+showNode :: TreePath -> Tree String -> Output
+showNode path node =
+	nodeRep ++ childRep
 	where
-		nodeRep  = leader ++ " - " ++ rootLabel node
-		childRep = concat $ map (showNode (leader ++ "  ")) (subForest node)
+		nodeName = rootLabel node
+		nodeRep  = appendLn [plain $ (replicate (2 * length path) ' ') ++ " - " ++ nodeName]
+		childRep = concat $ map (showNode (path ++ [nodeName])) (subForest node)
+
+-- TODO: coloourize nodes based on whether they are folders / files
+-- coloredNode :: TreePath -> String -> TextAtom
+-- coloredNode path name = (if isDir then yellow else plain) name
+-- 	where
+-- 		isDir = doesDirectoryExist (joinPath $ path ++ [name])
+
+
+
+-- pretty print
+pp :: Item -> String
+pp (Folder []) = "(empty list)"
+pp (Folder contents) = " - " ++ (intercalate "\n - " contents)
+pp (File contents) = contents
+
+-- ugly print
+up :: Item -> String
+up (Folder contents) = unlines contents
+up (File contents) = contents
+
+
+-- output formatting
+
+type TextAtom = (Maybe Term.Color, String)
+type Output = [TextAtom]
+
+color :: Term.Color -> a -> (Maybe Term.Color, a)
+color = (,) . Just
+plain = (,) Nothing
+red = color Term.Red
+blue = color Term.Blue
+green = color Term.Green
+yellow = color Term.Yellow
+
+render :: Output -> IO ()
+render outputs = mapM_ renderTextAtom outputs
+
+renderTextAtom :: TextAtom -> IO ()
+renderTextAtom = (uncurry renderTextAtom') . convertTextAtom where
+	renderTextAtom' :: [Term.SGR] -> String -> IO ()
+	renderTextAtom' _ "\n" = putStrLn ""
+	renderTextAtom' modes str = do
+		isTTY <- hIsTerminalDevice stdout
+		when isTTY $ Term.setSGR modes
+		putStr str
+		when isTTY $ Term.setSGR []
+
+convertTextAtom :: TextAtom -> ([Term.SGR], String)
+convertTextAtom (Nothing, str) = ([], str)
+convertTextAtom (Just col, str) = ([Term.SetColor Term.Foreground Term.Dull col], str)
+
+appendLn t = t ++ [plain "\n"]
+outLn = render . appendLn
