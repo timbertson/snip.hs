@@ -30,6 +30,7 @@ import Control.Monad
 import Control.Applicative ((<|>))
 import Data.List
 import Data.Tree
+import qualified Data.Text as T
 import Data.Maybe (isJust)
 import System.FilePath
 import System.Directory
@@ -69,23 +70,41 @@ run args = do
 getOrElse Nothing b = b
 getOrElse (Just a) _ = a
 
-type Action = (QueryPath -> DirTree -> IO ())
+type Action = QueryPath -> DirTree -> IO ()
 type LookupAction = (TreePath, DirTree) -> IO ()
 
-parseArgs :: [String] -> (Action, QueryPath)
-parseArgs [] = (actionHelp, [])
-parseArgs args@(x:xs)
-	| x == "get"   = (lookupAction actionGet, xs)
-	| x == "new"   = (actionNew, xs)
-	| x == "set"   = (actionSet, xs)
-	| x == "copy"  = (actionCopy, xs)
-	| x == "all"   = (actionAll, xs)
-	| x == "rm"    = (lookupAction actionRemove, xs)
-	| x == "which" = (lookupAction actionWhich, xs)
-	| otherwise    = (lookupAction actionGet, args)
+actions = [
+		("get",     actionGet,     Just "print the contents of a snippet or list"),
+		("set",     actionSet,     Just "set the contents of a snippet (create or update)"),
+		("copy",    actionCopy,    Just "copy the contents of a snippet to the clipboard (requires `pyperclip`)"),
+		("all",     actionAll,     Just "list all snippets"),
+		-- ("new",     actionNew,     Just "create a new list"),
+		("rm",      actionRemove,  Just "remove a snippet or list"),
+		("which",   actionWhich,   Just "show the path to a snippet"),
+		("--help",  actionHelp,    Nothing)
+	]
 
-actionGet :: LookupAction
-actionGet node = getSnippetContents node >>= putStrLn . pp
+parseArgs :: [String] -> (Action, QueryPath)
+parseArgs args = explitAction `getOrElse` defaultAction
+	where
+		explitAction = fmap useRemainingArgs $ parseAction (maybeHead args)
+		useRemainingArgs action = (action, tail args)
+		defaultAction = (actionGet, args)
+
+maybeHead :: [a] -> Maybe a
+maybeHead [] = Nothing
+maybeHead (x:xs) = Just x
+
+parseAction :: Maybe String -> Maybe Action
+parseAction Nothing = Just actionHelp
+parseAction (Just x) = fmap getAction $ find matchingAction actions
+	where
+		getAction (_, action, _) = action
+		getActionName (name, _, _) = name
+		matchingAction = (== x) . getActionName
+
+actionGet :: Action
+actionGet = lookupAction $ \node -> getSnippetContents node >>= putStrLn . pp
 
 actionCopy :: Action
 actionCopy search tree = (getValue search tree) >>= copyToClipboard search
@@ -93,10 +112,27 @@ actionCopy search tree = (getValue search tree) >>= copyToClipboard search
 actionSet :: Action
 actionSet args tree = do
 	let relpath = init args
-	val <- getInput $ last args
+	let relbase = init relpath
 	let path = addToRoot tree relpath
+	let base = addToRoot tree relbase
+	baseExists <- doesDirectoryExist base
+	unless baseExists (promptAndCreate relbase tree)
+	val <- getInput $ last args
 	writeFile path val
 	putStrLn $ "Got it. " ++ (joinPath relpath) ++ " is now: " ++ val
+
+promptAndCreate :: Action
+promptAndCreate args tree = do
+	continue <- (confirm $ "Folder " ++ (joinPath args) ++ " does not exist. create it?")
+	unless continue $ fail "Cancelled."
+	actionNew args tree
+
+confirm :: String -> IO Bool
+confirm question = do
+	putStr $ question ++ " [Y/n] "
+	hFlush stdout
+	answer <- getLine
+	return (answer `elem` ["","y","Y"])
 
 getInput "-" = do
 	putStrLn "(reading from stdin, ctrl+d to finish)"
@@ -106,18 +142,18 @@ getInput val = return val
 actionNew :: Action
 actionNew args tree = do
 	let path = addToRoot tree args
-	createDirectory path
+	createDirectoryIfMissing True path
 	putStrLn $ "Created: " ++ (joinPath args)
 
-actionWhich :: LookupAction
-actionWhich = putStrLn . joinPath . fst
+actionWhich :: Action
+actionWhich = lookupAction (putStrLn . joinPath . fst)
 
-actionRemove :: LookupAction
-actionRemove (path, _) = do
+actionRemove :: Action
+actionRemove = lookupAction (doRemove . fst) where
+	doRemove path = do
 			let path' = joinPath path
-			putStrLn $ "really delete" ++ path' ++ "? [Y/n]"
-			answer <- getLine
-			when (answer `elem` ["","y","Y"]) (putStrLn $ "TODO: remove" ++ path')
+			continue <- confirm $ "really delete" ++ path' ++ "?"
+			when continue (putStrLn $ "TODO: remove" ++ path')
 
 lookupAction :: LookupAction -> Action
 lookupAction action search tree = success `getOrElse` (fail $ "Could not find " ++ (describeSearch search))
@@ -125,12 +161,18 @@ lookupAction action search tree = success `getOrElse` (fail $ "Could not find " 
 		success = fmap action (resolvePath search tree)
 
 actionAll :: Action
-actionAll [] tree = do
-	putStr $ showTree tree
+actionAll [] tree = putStr $ showTree tree
 actionAll args _ = fail "too many arguments for `all`"
 
 actionHelp :: Action
-actionHelp args tree = putStrLn $ ("Your lists:\n" ++ (pp (Folder (map rootLabel (subForest tree)))))
+actionHelp args tree = putStrLn (unlines generalHelp)
+	where
+		generalHelp = describeActions ++ [""] ++ describeLists
+		helpOn (name, _, (Just desc)) = [pad name ++ desc]
+		helpOn (name, _, Nothing) = []
+		pad name = "  " ++ T.unpack (T.justifyLeft 5 ' ' (T.pack $ name)) ++ " : "
+		describeActions = "Actions:" : (concat $ map helpOn actions)
+		describeLists = "Your lists:" : [pp (Folder (map rootLabel (subForest tree)))]
 
 -- action helpers / workers
 
