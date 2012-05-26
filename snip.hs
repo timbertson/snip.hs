@@ -26,8 +26,13 @@ http://blog.moertel.com/articles/tag/directory_tree_series
 
 module Main (main) where
 
+import Prelude hiding (catch)
+import qualified Prelude
 import Control.Monad
 import Control.Applicative ((<|>))
+import Control.Exception (catch, SomeException)
+-- import Control.Exception
+import System.Exit (exitFailure)
 import Data.List
 import Data.Tree
 import qualified Data.Text as T
@@ -37,6 +42,7 @@ import System.Directory
 import System.Environment
 import System.IO
 import System.Process (readProcess)
+import qualified System.Console.ANSI as Term
 
 import System.IO.Unsafe
 
@@ -51,6 +57,37 @@ type DirNode    = (Path, DirName)  -- directory-path/dirname pair
 type DirTree    = Tree DirName     -- file-system tree
 
 data Item = Folder [DirName] | File String deriving Show
+type Output = (Maybe Term.Color, String)
+
+color :: Term.Color -> a -> (Maybe Term.Color, a)
+color = (,) . Just
+plain = (,) Nothing
+red = color Term.Red
+blue = color Term.Blue
+
+render :: [[Output]] -> IO ()
+render outputs = mapM_ renderLine outputs
+
+renderLine :: [Output] -> IO ()
+renderLine outputs = do
+	mapM_ renderOutput outputs
+	putStrLn ""
+
+renderOutput :: Output -> IO ()
+renderOutput = (uncurry renderOutput') . convertOutput where
+	renderOutput' :: [Term.SGR] -> String -> IO ()
+	renderOutput' modes str = do
+		Term.setSGR modes
+		putStr str
+		Term.setSGR []
+
+convertOutput :: Output -> ([Term.SGR], String)
+convertOutput (Nothing, str) = ([], str)
+convertOutput (Just col, str) = ([Term.SetColor Term.Foreground Term.Dull col], str)
+
+-- wrap a series of outputs into a single line
+outputLine :: [Output] -> [[Output]]
+outputLine = (: [])
 
 -- High-level program logic: process args and perform the appropriate action
 
@@ -59,13 +96,26 @@ main = do
 	args <- getArgs
 	run args
 
+run :: [String] -> IO ()
 run args = do
+	(run' args) `catch` errorAction
+	where
+		-- errorAction err :: IOException = showError (ioe_description err)
+		errorAction err = showError (show (err :: SomeException))
+		showError :: String -> IO ()
+		showError err = do
+			render (outputLine [red err])
+			exitFailure
+
+run' :: [String] -> IO ()
+run' args = do
 	let (action, query) = parseArgs args
+	colourize <- hIsTerminalDevice stdin
 	homedir <- getHomeDirectory
 	let base = joinOne homedir ".snip"
 	createDirectoryIfMissing True base
 	tree <- fsTraverse base
-	action query tree
+	(action query tree)
 
 getOrElse Nothing b = b
 getOrElse (Just a) _ = a
@@ -107,7 +157,10 @@ actionGet :: Action
 actionGet = lookupAction $ \node -> getSnippetContents node >>= putStrLn . pp
 
 actionCopy :: Action
-actionCopy search tree = (getValue search tree) >>= copyToClipboard search
+actionCopy search = lookupAction actionCopy' search
+	where
+		actionCopy' :: LookupAction
+		actionCopy' node = getSnippetContents node >>= (copyToClipboard search)
 
 actionSet :: Action
 actionSet args tree = do
@@ -184,7 +237,7 @@ copyToClipboard search item = do
 	putStrLn $ "Copied " ++ (describeSearch search) ++ " to your clipboard."
 
 describeSearch :: QueryPath -> String
-describeSearch = intercalate ">"
+describeSearch = joinPath
 
 getValue :: TreePath -> DirTree -> IO Item
 getValue path tree = success `getOrElse` (fail $ "Could not find " ++ (describeSearch path))
@@ -210,7 +263,7 @@ pp (File contents) = contents
 
 -- ugly print
 up :: Item -> String
-up (Folder contents) = intercalate "\n" contents
+up (Folder contents) = unlines contents
 up (File contents) = contents
 
 
@@ -273,7 +326,7 @@ fsTraverseStep dnode@(path, name) = do
 
 fsGetChildren :: Path -> IO [DirNode]
 fsGetChildren path = do
-	contents <- getDirectoryContents path `catch` const (return [])
+	contents <- getDirectoryContents path `Prelude.catch` const (return [])
 	let visibles = sort . filter (`notElem` [".", ".."]) $ contents
 	let isDir name = doesDirectoryExist $ joinOne path name
 	-- print visibles
