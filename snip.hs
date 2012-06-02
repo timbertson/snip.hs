@@ -1,4 +1,3 @@
-#!/usr/bin/runhaskell
 {-
 
 Copyright (C) 2012 Tim Cuthbertson
@@ -31,18 +30,19 @@ import qualified Prelude
 import Control.Monad
 import Control.Applicative ((<|>))
 import Control.Exception (catch, SomeException)
--- import Control.Exception
 import System.Exit (exitFailure)
 import Data.List
 import Data.Tree
-import qualified Data.Text as T
 import Data.Maybe (isJust)
 import System.FilePath
 import System.Directory
 import System.Environment
 import System.IO
 import System.Process (readProcess)
+
+#ifndef MINIMAL
 import qualified System.Console.ANSI as Term
+#endif
 
 import System.IO.Unsafe
 
@@ -97,7 +97,7 @@ actions = [
 		("set",     actionSet,     Just "set the contents of a snippet (create or update)"),
 		("copy",    actionCopy,    Just "copy the contents of a snippet to the clipboard (requires `pyperclip`)"),
 		("all",     actionAll,     Just "list all snippets"),
-		("rm",      actionRemove,  Just "remove a snippet or list"),
+		-- ("rm",      actionRemove,  Just "remove a snippet or list"),
 		("which",   actionWhich,   Just "show the path to a snippet"),
 		("--help",  actionHelp,    Nothing)
 	]
@@ -187,13 +187,16 @@ actionAll :: Action
 actionAll [] tree = render $ showTree tree
 actionAll args _ = fail "too many arguments for `all`"
 
+justifyLeft :: Int -> String -> String
+justifyLeft n str = str ++ replicate (max 0 (n - length str)) ' '
+
 actionHelp :: Action
 actionHelp args tree = putStrLn (unlines generalHelp)
 	where
 		generalHelp = describeActions ++ [""] ++ describeLists
 		helpOn (name, _, (Just desc)) = [pad name ++ desc]
 		helpOn (name, _, Nothing) = []
-		pad name = "  " ++ T.unpack (T.justifyLeft 5 ' ' (T.pack $ name)) ++ " : "
+		pad name = "  " ++ justifyLeft 5 name ++ " : "
 		describeActions = "Actions:" : (concat $ map helpOn actions)
 		describeLists = "Your lists:" : [pp (Folder (map rootLabel (subForest tree)))]
 
@@ -333,9 +336,10 @@ up (File contents) = contents
 
 -- output formatting
 
+#ifndef MINIMAL
+-- Colored formatting depends on System.Console.ANSI, which
+-- is NOT guaranteed to be available when running interactively (via runghc)
 type TextAtom = (Maybe Term.Color, String)
-type Output = [TextAtom]
-
 color :: Term.Color -> a -> (Maybe Term.Color, a)
 color = (,) . Just
 plain = (,) Nothing
@@ -343,9 +347,6 @@ red = color Term.Red
 blue = color Term.Blue
 green = color Term.Green
 yellow = color Term.Yellow
-
-render :: Output -> IO ()
-render outputs = mapM_ renderTextAtom outputs
 
 renderTextAtom :: TextAtom -> IO ()
 renderTextAtom = (uncurry renderTextAtom') . convertTextAtom where
@@ -360,6 +361,23 @@ renderTextAtom = (uncurry renderTextAtom') . convertTextAtom where
 convertTextAtom :: TextAtom -> ([Term.SGR], String)
 convertTextAtom (Nothing, str) = ([], str)
 convertTextAtom (Just col, str) = ([Term.SetColor Term.Foreground Term.Dull col], str)
+#else
+type TextAtom = String
+plain = id
+red = id
+blue = id
+green = id
+yellow = id
+
+renderTextAtom :: TextAtom -> IO ()
+renderTextAtom "\n" = putStrLn ""
+renderTextAtom s = putStr s
+#endif
+
+type Output = [TextAtom]
+
+render :: Output -> IO ()
+render outputs = mapM_ renderTextAtom outputs
 
 appendLn t = t ++ [plain "\n"]
 outLn = render . appendLn
