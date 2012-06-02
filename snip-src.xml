@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type='text/xsl' href='interface.xsl'?>
+<interface xmlns="http://zero-install.sourceforge.net/2004/injector/interface" xmlns:compile="http://zero-install.sourceforge.net/2006/namespaces/0compile" uri="http://gfxmonk.net/dist/0install/snip-src.xml">
+	<name>snip</name>
+	<summary>manage text snippets on the command line</summary>
+	<publish xmlns="http://gfxmonk.net/dist/0install" mode="default"/>
+	<description>
+	
+	</description>
+	<homepage/>
+	<group arch="*-src" compile:min-version="0.23">
+		<command name="compile" path="snip.hs">
+			<!-- TODO: this GHC_PACKAGE_PATH business is super hacky! -->
+			<environment mode="append" name="GHC_PACKAGE_PATH" value=""/>
+			<requires interface="http://gfxmonk.net/dist/0install/ghc.xml">
+				<version not-before="7.2"/>
+			</requires>
+			<runner interface="http://gfxmonk.net/dist/0install/ghc.xml">
+				<arg>-O</arg>
+				<arg>-cpp</arg>
+				<arg>-odir</arg>
+				<arg>$BUILDDIR</arg>
+				<arg>-hidir</arg>
+				<arg>$BUILDDIR</arg>
+				<arg>-o</arg>
+				<arg>$DISTDIR/snip</arg>
+			</runner>
+			<compile:implementation>
+				<command name="run" path="snip"/>
+			</compile:implementation>
+		</command>
+		<requires interface="http://gfxmonk.net/dist/0install/haskell-ansi-terminal.xml"/>
+		<implementation id="src_1ebcdcdb7f39f4a72a37f642b5a5a1a2f2f1df02" released="2012-05-27" version="0.1-post2">
+			<manifest-digest sha256="8383a558b083626310049131d8b5a4b56e8e6034f4968a5107e76e0828227108"/>
+			<archive href="http://gfxmonk.net/dist/0install/snip/snip-0.1.tgz" size="4573"/>
+		</implementation>
+	</group>
+	<feed-for interface="http://gfxmonk.net/dist/0install/snip.xml"/>
+</interface>
