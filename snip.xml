@@ -36,7 +36,7 @@
 			</compile:implementation>
 		</command>
 		<requires interface="http://gfxmonk.net/dist/0install/haskell-ansi-terminal.xml"/>
-		<implementation id="." released="2012-06-03" version="0.2">
+		<implementation id="." version="0.2-post">
 		</implementation>
 	</group>
 	<feed-for interface="http://gfxmonk.net/dist/0install/snip.xml"/>
