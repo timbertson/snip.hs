@@ -49,14 +49,19 @@ import System.IO.Unsafe
 
 -- Some convenient type synonyms
 
-type QueryPath  = [String]
-type TreePath   = [DirName]
+type QueryPath  = [String]         -- arguments given by user, which may not correspond directly to a path
+type TreePath   = [DirName]        -- path components from the root of the tree (i.e folder names)
 type DirName    = String           -- directory-entry name
-type DirTree    = Tree DirName     -- file-system tree
-type DirNode    = (FilePath, DirName)  -- directory-path/dirname pair
--- TODO: make DirNode a record type, combine it with Item below
+type DirTree    = Tree Item        -- file-system tree
+data Item = Item                   -- a snippet item (node in the tree)
+	{ filepath :: FilePath
+	, name     :: String
+	, contents :: ItemContents
+	} deriving (Show)
 
-data Item = Folder [DirName] | File String deriving Show
+data ItemContents =                -- an item's contents, which will either be sub-items or an actual snippet
+	Folder [DirName] |
+	File String deriving Show
 
 
 -- High-level program logic: process args and perform the appropriate action
@@ -70,7 +75,6 @@ run :: [String] -> IO ()
 run args = do
 	(run' args) `catch` errorAction
 	where
-		-- errorAction err :: IOException = showError (ioe_description err)
 		errorAction err = showError (show (err :: SomeException))
 		showError :: String -> IO ()
 		showError err = do
@@ -86,9 +90,6 @@ run' args = do
 	tree <- fsTraverse base
 	action query tree
 
-getOrElse Nothing b = b
-getOrElse (Just a) _ = a
-
 type Action = QueryPath -> DirTree -> IO ()
 type LookupAction = (TreePath, DirTree) -> IO ()
 
@@ -97,7 +98,7 @@ actions = [
 		("set",     actionSet,     Just "set the contents of a snippet (create or update)"),
 		("copy",    actionCopy,    Just "copy the contents of a snippet to the clipboard (requires `pyperclip`)"),
 		("all",     actionAll,     Just "list all snippets"),
-		-- ("rm",      actionRemove,  Just "remove a snippet or list"),
+		("rm",      actionRemove,  Just "remove a snippet or list"),
 		("which",   actionWhich,   Just "show the path to a snippet"),
 		("--help",  actionHelp,    Nothing)
 	]
@@ -109,10 +110,6 @@ parseArgs args = explitAction `getOrElse` defaultAction
 		useRemainingArgs action = (action, tail args)
 		defaultAction = (actionGet, args)
 
-maybeHead :: [a] -> Maybe a
-maybeHead [] = Nothing
-maybeHead (x:xs) = Just x
-
 parseAction :: Maybe String -> Maybe Action
 parseAction Nothing = Just actionHelp
 parseAction (Just x) = fmap getAction $ find matchingAction actions
@@ -122,13 +119,10 @@ parseAction (Just x) = fmap getAction $ find matchingAction actions
 		matchingAction = (== x) . getActionName
 
 actionGet :: Action
-actionGet = lookupAction $ \node -> getSnippetContents node >>= putStrLn . pp
+actionGet = lookupAction $ render . pp . getSnippetContents
 
 actionCopy :: Action
-actionCopy search = lookupAction actionCopy' search
-	where
-		actionCopy' :: LookupAction
-		actionCopy' node = getSnippetContents node >>= (copyToClipboard search)
+actionCopy search = lookupAction (\node -> copyToClipboard search $ getSnippetContents node) search
 
 actionSet :: Action
 actionSet args tree = do
@@ -142,24 +136,11 @@ actionSet args tree = do
 	writeFile path val
 	outLn [plain "Got it. ", yellow (joinPath relpath),  plain " is now ", green val]
 
--- promptAndCreate :: Action
 promptAndCreate args tree = do
 	continue <- (confirm $ "Folder " ++ (joinPath args) ++ " does not exist. create it?")
 	unless continue $ fail "Cancelled."
 	actionNew args tree
 	return ()
-
-confirm :: String -> IO Bool
-confirm question = do
-	putStr $ question ++ " [Y/n] "
-	hFlush stdout
-	answer <- getLine
-	return (answer `elem` ["","y","Y"])
-
-getInput "-" = do
-	putStrLn "(reading from stdin, ctrl+d to finish)"
-	getContents
-getInput val = return val
 
 actionNew :: Action
 actionNew args tree = do
@@ -171,11 +152,13 @@ actionWhich :: Action
 actionWhich = lookupAction (putStrLn . joinPath . fst)
 
 actionRemove :: Action
-actionRemove = lookupAction (doRemove . fst) where
-	doRemove path = do
-			let path' = joinPath path
-			continue <- confirm $ "really delete" ++ path' ++ "?"
-			when continue (putStrLn $ "TODO: remove" ++ path')
+actionRemove = lookupAction doRemove where
+	doRemove (path, node) = do
+		let path' = joinPath path
+		continue <- confirm $ "Really delete " ++ path' ++ "?"
+		when continue (rm path' (contents $ rootLabel node) >> outLn [plain "Deleted ", red path'])
+	rm path (Folder _) = removeDirectoryRecursive path
+	rm path (File _  ) = removeFile path
 
 lookupAction :: LookupAction -> Action
 lookupAction action search tree = success `getOrElse` (fail $ "Could not find " ++ (describeSearch search))
@@ -183,26 +166,23 @@ lookupAction action search tree = success `getOrElse` (fail $ "Could not find " 
 		success = fmap action (resolvePath search tree)
 
 actionAll :: Action
--- TODO: make `all` render the contents, truncated at first `n` chatacters of first line
 actionAll [] tree = render $ showTree tree
 actionAll args _ = fail "too many arguments for `all`"
 
-justifyLeft :: Int -> String -> String
-justifyLeft n str = str ++ replicate (max 0 (n - length str)) ' '
-
 actionHelp :: Action
-actionHelp args tree = putStrLn (unlines generalHelp)
+actionHelp args tree = render generalHelp
 	where
-		generalHelp = describeActions ++ [""] ++ describeLists
-		helpOn (name, _, (Just desc)) = [pad name ++ desc]
+		generalHelp = describeActions ++ [newLn] ++ describeLists
+		helpOn (name, _, (Just desc)) = appendLn $ pad name ++ [plain desc]
 		helpOn (name, _, Nothing) = []
-		pad name = "  " ++ justifyLeft 5 name ++ " : "
-		describeActions = "Actions:" : (concat $ map helpOn actions)
-		describeLists = "Your lists:" : [pp (Folder (map rootLabel (subForest tree)))]
+		pad name = [helpActionColor ("  " ++ justifyLeft 5 name), plain " : "]
+		describeActions = [plain "Actions:", newLn] ++ (concat $ map helpOn actions)
+		describeLists = (plain "Your lists:") : newLn : pp (contents $ rootLabel tree)
 
 -- action helpers / workers
 
-addToRoot tree path = joinPath ([rootLabel tree] ++ path)
+addToRoot :: DirTree -> QueryPath -> FilePath
+addToRoot tree path = joinPath ([name $ rootLabel tree] ++ path)
 
 copyToClipboard search item = do
 	output <- readProcess "pyperclip" ["--copy"] (up item)
@@ -212,21 +192,8 @@ copyToClipboard search item = do
 describeSearch :: QueryPath -> String
 describeSearch = joinPath
 
-getValue :: TreePath -> DirTree -> IO Item
-getValue path tree = success `getOrElse` (fail $ "Could not find " ++ (describeSearch path))
-	where success = (fmap getSnippetContents) (resolvePath path tree)
-
-getSnippetContents :: (TreePath, DirTree) -> IO Item
-getSnippetContents match@(path, tree) =
-	(doesDirectoryExist (joinPath path)) >>= \isDir ->
-		if isDir
-			then return $ Folder (map rootLabel (subForest tree))
-			else do
-				let fullPath = (joinPath path)
-				-- putStrLn $ "reading file: " ++ fullPath
-				contents <- readFile fullPath
-				return $ File contents
-
+getSnippetContents :: (TreePath, DirTree) -> ItemContents
+getSnippetContents = contents . rootLabel . snd
 
 -- tree traversal / searching
 
@@ -234,7 +201,7 @@ firstMatch :: [Maybe a] -> Maybe a
 firstMatch items = join $ find isJust items
 
 resolvePath :: TreePath -> DirTree -> Maybe (TreePath, DirTree)
-resolvePath path tree = foldl resolveOne (Just ([rootLabel tree], tree)) path
+resolvePath path tree = foldl resolveOne (Just ([name $ rootLabel tree], tree)) path
 
 resolveOne :: Maybe (TreePath, DirTree) -> DirName -> Maybe (TreePath, DirTree)
 resolveOne start needle = join $ fmap applyFind start
@@ -254,10 +221,11 @@ findBF' needle prefix tree = topLevelMatch <|> findNextLevel
 		findNextLevel = firstMatch $ map subFindBF (subForest tree)
 		subFindBF :: DirTree -> Maybe (TreePath, DirTree)
 		subFindBF node = findBF' needle (prefix `ncons` node) node
-		findInLevel :: DirName -> TreePath -> Forest DirName -> Maybe (TreePath, DirTree)
+		findInLevel :: DirName -> TreePath -> Forest Item -> Maybe (TreePath, DirTree)
 		findInLevel needle prefix nodes = fmap (returnTree prefix) found
 			where
-				found = find (((==) needle) . rootLabel) nodes
+				found :: Maybe DirTree
+				found = find (((==) needle) . name . rootLabel) nodes
 
 returnTree :: TreePath -> DirTree -> (TreePath, DirTree)
 returnTree prefix node = (ncons prefix node, node)
@@ -265,7 +233,7 @@ returnTree prefix node = (ncons prefix node, node)
 -- path manipulation
 
 ncons :: TreePath -> DirTree -> TreePath
-ncons xs x = xs `pcons` (rootLabel x)
+ncons xs x = xs `pcons` (name $ rootLabel x)
 
 pcons :: TreePath -> String -> TreePath
 pcons xs x = xs ++ [x]
@@ -277,21 +245,32 @@ joinOne a b = joinPath [a,b]
 fsTraverse :: FilePath -> IO DirTree
 fsTraverse path = (lazyUnfoldTreeM fsTraverseStep) (path, path)
 
-fsTraverseStep :: DirNode -> IO (DirName, [DirNode])
-fsTraverseStep dnode@(path, name) = do
-	children <- fsGetChildren (joinOne path name)
-	return (name, children)
+fsTraverseStep :: (FilePath,String) -> IO (Item, [(FilePath,String)])
+fsTraverseStep node@(path, name) = do
+	item <- mkItem path name
+	let children = getChildren $ contents item
+	return (item, children)
+	where
+		getChildren (File _) = []
+		getChildren (Folder children) = map (\name -> (joinOne path name, name)) children
 
+mkItem :: FilePath -> String -> IO Item
+mkItem path name = do
+	contents <- getContents path
+	return $ Item { filepath=path, name=name, contents=contents}
+	where
+		getContents :: FilePath -> IO ItemContents
+		getContents path = do
+			isdir <- doesDirectoryExist path
+			(if isdir then getFolder else getFile) path
+		getFile :: FilePath -> IO ItemContents
+		getFile path = readFile path >>= return . File
+		getFolder :: FilePath -> IO ItemContents
+		getFolder path = getVisibleDirectoryContents path >>= return . Folder
 
--- Helper to get traversable directory entries
-
-fsGetChildren :: FilePath -> IO [DirNode]
-fsGetChildren path = do
-	contents <- getDirectoryContents path `Prelude.catch` const (return [])
-	let visibles = sort . filter (`notElem` [".", ".."]) $ contents
-	let isDir name = doesDirectoryExist $ joinOne path name
-	-- print visibles
-	return (map ((,) path) visibles)
+getVisibleDirectoryContents :: FilePath -> IO [FilePath]
+getVisibleDirectoryContents path = getDirectoryContents path >>=
+	return . sort . filter (`notElem` [".", ".."])
 
 lazyUnfoldTreeM :: (b -> IO (a, [b])) -> b -> IO (Tree a)
 lazyUnfoldTreeM step seed = do
@@ -303,38 +282,59 @@ lazyUnfoldTreeM step seed = do
 
 -- Purely functional tree-to-string formatting
 
-showTree :: Tree String -> Output
+showTree :: DirTree -> Output
 showTree t = concat $ map (showNode []) (subForest t)
 
-showNode :: TreePath -> Tree String -> Output
-showNode path node =
+showNode :: TreePath -> DirTree -> Output
+showNode path tree =
 	nodeRep ++ childRep
 	where
-		nodeName = rootLabel node
-		nodeRep  = appendLn [plain $ (replicate (2 * length path) ' ') ++ " - " ++ nodeName]
-		childRep = concat $ map (showNode (path ++ [nodeName])) (subForest node)
+		node = rootLabel tree
+		nodeName = name $ node
+		nodeRep  = appendLn $ [plain prefix] ++ summarizeNode node
+		prefix = (replicate (2 * length path) ' ') ++ " - "
+		childRep = concat $ map (showNode (path ++ [nodeName])) (subForest tree)
 
--- TODO: coloourize nodes based on whether they are folders / files
--- coloredNode :: TreePath -> String -> TextAtom
--- coloredNode path name = (if isDir then yellow else plain) name
--- 	where
--- 		isDir = doesDirectoryExist (joinPath $ path ++ [name])
-
-
+summarizeNode Item { name=name, contents = (Folder _) } = [snippetFolderColor name]
+summarizeNode Item { name=name, contents = (File str) } = [snippetNameColor name, plain ": "] ++ ellipsize summary
+	where
+		max = 50
+		summary = take max (takeWhile (/= '\n') str)
+		ellipsize summary = if summary == str then [plain summary] else [plain $ (take (max-3) summary) ++ "..."]
 
 -- pretty print
-pp :: Item -> String
-pp (Folder []) = "(empty list)"
-pp (Folder contents) = " - " ++ (intercalate "\n - " contents)
-pp (File contents) = contents
+pp :: ItemContents -> Output
+pp (Folder []) = [yellow "(empty list)"]
+pp (Folder contents) = concat $ map (\name -> [plain " - ", yellow name, newLn]) contents
+pp (File contents) = appendLn [plain contents]
 
 -- ugly print
-up :: Item -> String
+up :: ItemContents -> String
 up (Folder contents) = unlines contents
 up (File contents) = contents
 
+getOrElse Nothing b = b
+getOrElse (Just a) _ = a
 
--- output formatting
+maybeHead :: [a] -> Maybe a
+maybeHead [] = Nothing
+maybeHead (x:xs) = Just x
+
+justifyLeft :: Int -> String -> String
+justifyLeft n str = str ++ replicate (max 0 (n - length str)) ' '
+
+confirm :: String -> IO Bool
+confirm question = do
+	putStr $ question ++ " [Y/n] "
+	hFlush stdout
+	answer <- getLine
+	return (answer `elem` ["","y","Y"])
+
+getInput "-" = do
+	putStrLn "(reading from stdin, ctrl+d to finish)"
+	getContents
+getInput val = return val
+
 
 #ifndef MINIMAL
 -- Colored formatting depends on System.Console.ANSI, which
@@ -345,6 +345,7 @@ color = (,) . Just
 plain = (,) Nothing
 red = color Term.Red
 blue = color Term.Blue
+cyan = color Term.Cyan
 green = color Term.Green
 yellow = color Term.Yellow
 
@@ -366,6 +367,7 @@ type TextAtom = String
 plain = id
 red = id
 blue = id
+cyan = id
 green = id
 yellow = id
 
@@ -374,10 +376,16 @@ renderTextAtom "\n" = putStrLn ""
 renderTextAtom s = putStr s
 #endif
 
+-- meaningful colour aliases
+snippetNameColor = green
+snippetFolderColor = yellow
+helpActionColor = cyan
+
 type Output = [TextAtom]
 
 render :: Output -> IO ()
 render outputs = mapM_ renderTextAtom outputs
 
-appendLn t = t ++ [plain "\n"]
+appendLn t = t ++ [newLn]
+newLn = plain "\n"
 outLn = render . appendLn
