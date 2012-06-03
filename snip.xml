@@ -3,7 +3,7 @@
 <interface uri="http://gfxmonk.net/dist/0install/snip-src.xml" xmlns="http://zero-install.sourceforge.net/2004/injector/interface" xmlns:compile="http://zero-install.sourceforge.net/2006/namespaces/0compile" xmlns:release="http://zero-install.sourceforge.net/2007/namespaces/0release">
 	<name>snip</name>
 	<summary>manage text snippets on the command line</summary>
-	<publish xmlns="http://gfxmonk.net/dist/0install" mode="default"/>
+	<publish mode="default" xmlns="http://gfxmonk.net/dist/0install"/>
 	<feed arch="*-src" src="http://gfxmonk.net/dist/0install/snip-src.xml"/>
 	<feed arch="*-*" src="http://gfxmonk.net/dist/0install/snip-interpreted.xml"/>
 	<description>
@@ -36,7 +36,7 @@
 			</compile:implementation>
 		</command>
 		<requires interface="http://gfxmonk.net/dist/0install/haskell-ansi-terminal.xml"/>
-		<implementation id="." version="0.1-post2-post">
+		<implementation id="." released="2012-06-03" version="0.2">
 		</implementation>
 	</group>
 	<feed-for interface="http://gfxmonk.net/dist/0install/snip.xml"/>

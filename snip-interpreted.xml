@@ -22,5 +22,9 @@
 			<manifest-digest sha256="8383a558b083626310049131d8b5a4b56e8e6034f4968a5107e76e0828227108"/>
 			<archive href="http://gfxmonk.net/dist/0install/snip/snip-0.1.tgz" size="4573"/>
 		</implementation>
+		<implementation id="sha1new=9cc91b9bff32a1fd5dfd4d96f434cd3b4ae741f5" released="2012-06-03" version="0.2">
+			<manifest-digest sha256="213486d9e19005fe612655e70ff984844ba4f73145349eb7d48a46048ff63fd4"/>
+			<archive href="http://gfxmonk.net/dist/0install/snip-interpreted/snip-interpreted-0.2.tgz" size="4780"/>
+		</implementation>
 	</group>
 </interface>
