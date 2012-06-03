@@ -3,11 +3,12 @@
 <interface xmlns="http://zero-install.sourceforge.net/2004/injector/interface" xmlns:compile="http://zero-install.sourceforge.net/2006/namespaces/0compile" uri="http://gfxmonk.net/dist/0install/snip-src.xml">
 	<name>snip</name>
 	<summary>manage text snippets on the command line</summary>
-	<publish xmlns="http://gfxmonk.net/dist/0install" mode="default"/>
+	<publish xmlns="http://gfxmonk.net/dist/0install" mode="ignore"/>
 	<description>
 	
 	</description>
-	<homepage/>
+	<homepage>https://github.com/gfxmonk/snip.hs</homepage>
+	<feed-for interface="http://gfxmonk.net/dist/0install/snip.xml"/>
 	<group arch="*-src" compile:min-version="0.23">
 		<command name="compile" path="snip.hs">
 			<!-- TODO: this GHC_PACKAGE_PATH business is super hacky! -->
@@ -35,5 +36,4 @@
 			<archive href="http://gfxmonk.net/dist/0install/snip/snip-0.1.tgz" size="4573"/>
 		</implementation>
 	</group>
-	<feed-for interface="http://gfxmonk.net/dist/0install/snip.xml"/>
 </interface>
