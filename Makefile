@@ -1,30 +1,35 @@
-snip: build/snip
-.PHONY: snip
+snip: compile
 
-build/snip: snip.hs
-	mkdir -p build
-	cd build && ghc -O -cpp ../snip.hs
+.PHONY: interp
+interp:
+	runghc -cpp -DMINIMAL snip.hs all
 
-snip-local.xml: snip.xml
-	0local snip.xml
+.PHONY: release
+release:
+	0release-gfxmonk snip.xml \
+		--public-scm-repository=origin \
+		--archive-upload-command='' \
+		--master-feed-upload-command=''
+
+0compile:
+	0compile setup snip.xml 0compile
+
+compile: 0compile
+	cd 0compile && \
+		0compile build --clean
+	ln -sf 0compile/snip-linux-x86_64/snip
+
+.PHONY: ghci
+ghci:
+	0path --shell http://gfxmonk.net/dist/0install/haskell-ansi-terminal.xml
+	0launch --command=ghci http://gfxmonk.net/dist/0install/ghc.xml
 
 clean:
 	rm snip snip.hi snip.o
 .PHONY: clean
 
-0:
-	mkzero-gfxmonk -p snip.hs snip.xml
-.PHONY: 0
 
-0compile:
-	rm -rf ./0compile
-	0compile setup snip.xml 0compile
-	(cd 0compile && 0compile build)
-.PHONY: 0compile
-
-0publish:
-	(cd 0compile && 0compile publish 'http://gfxmonk.net/dist/0install/snip/')
-	cp 0compile/snip-*.bz2 ~/Sites/gfxmonk/dist/0install/snip/
-	0publish --add-from ./0compile/*.xml
-.PHONY: 0publish
+clean-release:
+	rm -f 0inst/release-status
+.PHONY: clean-release
 

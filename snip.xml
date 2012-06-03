@@ -12,7 +12,7 @@
 	<homepage>https://github.com/gfxmonk/snip.hs</homepage>
 	<release:management>
 		<release:action phase="commit-release">mkzero-gfxmonk -p snip.hs -v &quot;$RELEASE_VERSION&quot; snip-interpreted.xml</release:action>
-		<release:action phase="generate-archive">rm snip-*.xml</release:action>
+		<release:action phase="generate-archive">rm snip-*.xml Makefile</release:action>
 	</release:management>
 	<group arch="*-src" compile:min-version="0.23">
 		<command name="compile" path="snip.hs">
