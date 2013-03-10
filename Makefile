@@ -8,8 +8,8 @@ interp:
 release:
 	0release-gfxmonk snip.xml \
 		--public-scm-repository=origin \
-		--archive-upload-command='' \
-		--master-feed-upload-command=''
+		--archive-upload-command='copyto ~/Sites/gfxmonk/dist/0install/snip/' \
+		--master-feed-upload-command='copyto ~/Sites/gfxmonk/dist/0install/snip/'
 
 0compile:
 	0compile setup snip.xml 0compile
