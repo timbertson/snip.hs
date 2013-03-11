@@ -4,40 +4,12 @@
 	<name>snip</name>
 	<summary>manage text snippets on the command line</summary>
 	<publish mode="default" xmlns="http://gfxmonk.net/dist/0install"/>
-	<feed arch="*-src" src="http://gfxmonk.net/dist/0install/snip-src.xml"/>
 	<feed arch="*-*" src="http://gfxmonk.net/dist/0install/snip-interpreted.xml"/>
 	<description>
 	
 	</description>
 	<homepage>https://github.com/gfxmonk/snip.hs</homepage>
-	<release:management>
-		<release:action phase="commit-release">mkzero-gfxmonk -p snip.hs -v &quot;$RELEASE_VERSION&quot; snip-interpreted.xml</release:action>
-		<release:action phase="generate-archive">rm snip-*.xml Makefile</release:action>
-	</release:management>
 	<group arch="*-src" compile:min-version="0.23">
-		<command name="compile" path="snip.hs">
-			<!-- TODO: this GHC_PACKAGE_PATH business is super hacky! -->
-			<environment mode="append" name="GHC_PACKAGE_PATH" value=""/>
-			<requires interface="http://gfxmonk.net/dist/0install/ghc.xml">
-				<version not-before="7.2"/>
-			</requires>
-			<runner interface="http://gfxmonk.net/dist/0install/ghc.xml">
-				<arg>-O</arg>
-				<arg>-cpp</arg>
-				<arg>-odir</arg>
-				<arg>$BUILDDIR</arg>
-				<arg>-hidir</arg>
-				<arg>$BUILDDIR</arg>
-				<arg>-o</arg>
-				<arg>$DISTDIR/snip</arg>
-			</runner>
-			<compile:implementation>
-				<command name="run" path="snip"/>
-			</compile:implementation>
-		</command>
-		<requires interface="http://gfxmonk.net/dist/0install/haskell-ansi-terminal.xml"/>
-		<implementation id="." version="0.2-post">
-		</implementation>
 	</group>
 	<feed-for interface="http://gfxmonk.net/dist/0install/snip.xml"/>
 </interface>

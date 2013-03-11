@@ -6,10 +6,13 @@ interp:
 
 .PHONY: release
 release:
-	0release-gfxmonk snip.xml \
-		--public-scm-repository=origin \
-		--archive-upload-command='copyto ~/Sites/gfxmonk/dist/0install/snip/' \
-		--master-feed-upload-command='copyto ~/Sites/gfxmonk/dist/0install/snip/'
+	0release --release snip-local.xml \
+		--master-feed-file=snip.xml \
+		--archive-dir-public-url="http://gfxmonk.net/dist/0install/snip" \
+		--public-scm-repository=test-release \
+		--archive-upload-command='copyto ~/Sites/gfxmonk/dist/0install/snip_TEST/' \
+		--master-feed-upload-command='copyto ~/Sites/gfxmonk/dist/0install/snip_TEST/'
+	mkzero-gfxmonk -p snip.gs -v `cat VERSION` snip-interpreted.xml
 
 0compile:
 	0compile setup snip.xml 0compile

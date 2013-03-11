@@ -1,0 +1,11 @@
+name: net-gfxmonk-snip
+version: 0.1
+build-type: Simple
+cabal-version: >= 1.10
+
+Executable snip
+  main-is: snip.hs
+  default-language: Haskell98
+  build-depends: base, ansi-terminal, process, directory, filepath, containers
+  default-extensions: CPP
+  ghc-options: -O
