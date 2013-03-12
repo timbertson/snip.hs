@@ -17,5 +17,9 @@
 				<arg>-DMINIMAL</arg>
 			</runner>
 		</command>
+		<implementation id="sha1new=9cc91b9bff32a1fd5dfd4d96f434cd3b4ae741f5" released="2013-03-12" version="0.2.1">
+			<manifest-digest sha256new="EE2INWPBSAC74YJGKXTQ76MEQRF2J5ZRIU2J5N6URJDAJD7WH7KA"/>
+			<archive href="http://gfxmonk.net/dist/0install/snip-interpreted/snip-interpreted-0.2.1.tgz" size="4780"/>
+		</implementation>
 	</group>
 </interface>

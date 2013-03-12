@@ -1,16 +1,16 @@
-<?xml version="1.0"?>
+<?xml version="1.0" ?>
 <?xml-stylesheet type='text/xsl' href='interface.xsl'?>
-<interface xmlns="http://zero-install.sourceforge.net/2004/injector/interface" xmlns:compile="http://zero-install.sourceforge.net/2006/namespaces/0compile" uri="http://gfxmonk.net/dist/0install/snip-src.xml" xmlns:release="http://zero-install.sourceforge.net/2007/namespaces/0release">
+<interface uri="http://gfxmonk.net/dist/0install/snip-src.xml" xmlns="http://zero-install.sourceforge.net/2004/injector/interface" xmlns:compile="http://zero-install.sourceforge.net/2006/namespaces/0compile" xmlns:release="http://zero-install.sourceforge.net/2007/namespaces/0release">
 	<name>snip</name>
 	<summary>manage text snippets on the command line</summary>
-	<publish xmlns="http://gfxmonk.net/dist/0install" mode="ignore"/>
+	<publish mode="ignore" xmlns="http://gfxmonk.net/dist/0install"/>
 	<description>
 	
 	</description>
 	<homepage>https://github.com/gfxmonk/snip.hs</homepage>
 	<release:management>
-		<release:action phase="commit-release">mkzero-gfxmonk -p snip.hs -v &quot;$RELEASE_VERSION&quot; snip-interpreted.xml</release:action>
-		<release:action phase="generate-archive">rm snip-*.xml Makefile</release:action>
+		<release:action phase="generate-archive">rm snip-interpreted.xml Makefile</release:action>
+		<release:action phase="commit-release">mkzero-gfxmonk -p snip.hs -v `cat VERSION` snip-interpreted.xml &amp;&amp; vim snip-interpreted.xml</release:action>
 	</release:management>
 	<group arch="*-src" compile:min-version="0.23">
 		<command name="compile">
@@ -21,7 +21,7 @@
 			</compile:implementation>
 		</command>
 		<requires interface="http://gfxmonk.net/dist/0install/haskell-ansi-terminal-dev.xml"/>
-		<implementation id="." version="0.1-post3"/>
+		<implementation id="." released="2013-03-12" version="0.2.1"/>
 	</group>
 	<feed-for interface="http://gfxmonk.net/dist/0install/snip.xml"/>
 </interface>
