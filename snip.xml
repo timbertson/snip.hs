@@ -1,10 +1,9 @@
 <?xml version="1.0" ?>
 <?xml-stylesheet type='text/xsl' href='interface.xsl'?>
-<interface uri="http://gfxmonk.net/dist/0install/snip-src.xml" xmlns="http://zero-install.sourceforge.net/2004/injector/interface" xmlns:compile="http://zero-install.sourceforge.net/2006/namespaces/0compile" xmlns:ns="http://zero-install.sourceforge.net/2006/namespaces/0compile" xmlns:release="http://zero-install.sourceforge.net/2007/namespaces/0release">
+<interface uri="http://gfxmonk.net/dist/0install/snip.xml" xmlns="http://zero-install.sourceforge.net/2004/injector/interface" xmlns:compile="http://zero-install.sourceforge.net/2006/namespaces/0compile" xmlns:ns="http://zero-install.sourceforge.net/2006/namespaces/0compile" xmlns:release="http://zero-install.sourceforge.net/2007/namespaces/0release">
 	<name>snip</name>
 	<summary>manage text snippets on the command line</summary>
 	<publish mode="default" xmlns="http://gfxmonk.net/dist/0install"/>
-	<feed arch="*-*" src="http://gfxmonk.net/dist/0install/snip-interpreted.xml"/>
 	<description>
 	
 	</description>
@@ -32,7 +31,7 @@
       <archive extract="snip-linux-x86_64-0.2.1" href="http://gfxmonk.net/dist/0install/snip/snip-linux-x86_64-0.2.1.tar.bz2" size="326497"/></implementation>
 </interface>
 <!-- Base64 Signature
-iEYEABECAAYFAlE+9HEACgkQ/lhgK1iJTtKqPwCfR3/0BlngFLnLghcNfoXvErEaUxkAnjVCeCia
-vnCwYP24QQvs+wAQxzl6
+iEYEABECAAYFAlFAZjMACgkQ/lhgK1iJTtIfkQCfU1hHea5gY3LUy7hGY6IK9wkxg/cAmwXqaYaM
+9QlDLqC6Ju54T3ud7W9/
 
 -->
