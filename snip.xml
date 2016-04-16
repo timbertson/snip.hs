@@ -1,37 +1,27 @@
-<?xml version="1.0" ?>
+<?xml version="1.0"?>
 <?xml-stylesheet type='text/xsl' href='interface.xsl'?>
-<interface uri="http://gfxmonk.net/dist/0install/snip.xml" xmlns="http://zero-install.sourceforge.net/2004/injector/interface" xmlns:compile="http://zero-install.sourceforge.net/2006/namespaces/0compile" xmlns:ns="http://zero-install.sourceforge.net/2006/namespaces/0compile" xmlns:release="http://zero-install.sourceforge.net/2007/namespaces/0release">
+<interface xmlns="http://zero-install.sourceforge.net/2004/injector/interface" xmlns:compile="http://zero-install.sourceforge.net/2006/namespaces/0compile" xmlns:ns="http://zero-install.sourceforge.net/2006/namespaces/0compile" xmlns:release="http://zero-install.sourceforge.net/2007/namespaces/0release" uri="http://gfxmonk.net/dist/0install/snip.xml">
 	<name>snip</name>
 	<summary>manage text snippets on the command line</summary>
-	<publish mode="default" xmlns="http://gfxmonk.net/dist/0install"/>
+	<publish xmlns="http://gfxmonk.net/dist/0install" mode="default"/>
 	<description>
-	
 	</description>
 	<homepage>https://github.com/gfxmonk/snip.hs</homepage>
 	<group arch="*-src" compile:min-version="0.23">
-	
-   <group>
-     <requires interface="http://gfxmonk.net/dist/0install/haskell-ansi-terminal-dev.xml"/>
-     <command name="compile">
-			<environment insert="" mode="prepend" name="CABAL_PKG_PATH"/>
-			<runner interface="/home/tim/dev/0install/cabal-src-build/cabal-src-build-local.xml"/>
-			<compile:implementation>
-				<command name="run" path="bin/snip"/>
-			</compile:implementation>
-		</command>
-     <implementation id="sha1new=32c7f62fac75cb4a9fdfd71486c4d905e65efc54" released="2013-03-12" version="0.2.1">
-    <manifest-digest sha256new="J6YWRGQBWE6ICPWKDQ4XDPG6JQFRQ6Y7N3LCGC6J7Q2BAXREU2HQ"/>
-    <archive extract="snip-0.2.1" href="http://gfxmonk.net/dist/0install/snip/snip-0.2.1.tar.bz2" size="5739"/>
-  </implementation>
-   </group>
- </group>
+		<group>
+			<requires interface="http://gfxmonk.net/dist/0install/haskell-ansi-terminal-dev.xml"/>
+			<command name="compile">
+				<environment insert="" mode="prepend" name="CABAL_PKG_PATH"/>
+				<runner interface="/home/tim/dev/0install/cabal-src-build/cabal-src-build-local.xml"/>
+				<compile:implementation>
+					<command name="run" path="bin/snip"/>
+				</compile:implementation>
+			</command>
+			<implementation id="sha1new=32c7f62fac75cb4a9fdfd71486c4d905e65efc54" released="2013-03-12" version="0.2.1">
+				<manifest-digest sha256new="J6YWRGQBWE6ICPWKDQ4XDPG6JQFRQ6Y7N3LCGC6J7Q2BAXREU2HQ"/>
+				<archive extract="snip-0.2.1" href="http://gfxmonk.net/dist/0install/snip/snip-0.2.1.tar.bz2" size="5739"/>
+			</implementation>
+		</group>
+	</group>
 	<feed-for interface="http://gfxmonk.net/dist/0install/snip.xml"/>
-  <implementation arch="Linux-x86_64" id="sha1new=d5bb9597236360e0e78359332d92553031edcc23" released="2013-03-12" version="0.2.1"><command name="run" path="bin/snip"/>
-      <manifest-digest sha256new="EMNJWKHP2I6FAIZUVUIMXHM3FWKVAQ7DMOXJWNJV7UGM6WBY7CBQ"/>
-      <archive extract="snip-linux-x86_64-0.2.1" href="http://gfxmonk.net/dist/0install/snip/snip-linux-x86_64-0.2.1.tar.bz2" size="326497"/></implementation>
 </interface>
-<!-- Base64 Signature
-iEYEABECAAYFAlFAZjMACgkQ/lhgK1iJTtIfkQCfU1hHea5gY3LUy7hGY6IK9wkxg/cAmwXqaYaM
-9QlDLqC6Ju54T3ud7W9/
-
--->
