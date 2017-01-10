@@ -2,3 +2,4 @@
 *.o
 snip
 0compile
+dist/
